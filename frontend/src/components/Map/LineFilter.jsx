@@ -1,8 +1,10 @@
 import React from 'react';
-import { metroLines } from '../../data/mumbaiMetro.js';
+import { metroLines, DISPLAY_LINE_IDS } from '../../data/mumbaiMetro.js';
 
 function LineFilter({ activeLineId, onSelect }) {
-  const chips = [{ id: null, label: 'All', flag: '#' }, ...metroLines.map((l) => ({
+  const chips = [{ id: null, label: 'All', flag: '#' }, ...metroLines
+    .filter((l) => DISPLAY_LINE_IDS.includes(l.id))
+    .map((l) => ({
     id: l.id,
     label: `Line ${l.number}`,
     flag: l.number,

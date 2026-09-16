@@ -7,6 +7,8 @@ export const METRO_COLORS = {
   'line-9': '#e0241f'
 }
 
+export const DISPLAY_LINE_IDS = ['line-2a', 'line-2b', 'line-7', 'line-9']
+
 export const metroLines = [
   {
     id: 'line-1',

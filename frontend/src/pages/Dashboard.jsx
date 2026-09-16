@@ -8,7 +8,7 @@ import * as stationService from '../services/station.service.js';
 import * as dashboardService from '../services/dashboard.service.js';
 import * as stockService from '../services/stock.service.js';
 import { getErrorMessage, formatDateTime, getStockLevel, formatNumber } from '../utils/formatters.js';
-import { metroLines, metroStations } from '../data/mumbaiMetro.js';
+import { metroLines, metroStations, DISPLAY_LINE_IDS } from '../data/mumbaiMetro.js';
 import KpiCard from '../components/KpiCard.jsx';
 import FilterBar from '../components/FilterBar.jsx';
 import DataTable from '../components/DataTable.jsx';
@@ -47,7 +47,9 @@ const MAP_BOUNDS = [
   [19.3, 72.97],
 ];
 
-const lineCoordinates = metroLines.map((line) => ({
+const lineCoordinates = metroLines
+  .filter((line) => DISPLAY_LINE_IDS.includes(line.id))
+  .map((line) => ({
   ...line,
   positions: line.stations
     .map((id) => {
