@@ -1,0 +1,24 @@
+{
+  "name": "metropad-care-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js",
+    "db:migrate": "node db/migrate.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.3.0",
+    "pdfkit": "^0.20.2",
+    "pg": "^8.23.0",
+    "xlsx": "^0.18.5"
+  }
+}
