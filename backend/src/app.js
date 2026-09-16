@@ -21,39 +21,58 @@ import auditRoutes from './routes/audit.route.js'
 
 dotenv.config()
 
+const createApiRouter = () => {
+  const api = express.Router()
+
+  api.get('/', (req, res) => {
+    res.json({ success: true, message: 'MetroPad Care API. Health check: /api/health' })
+  })
+
+  api.get('/health', (req, res) => {
+    res.json({ success: true, message: 'MetroPad Care backend is running' })
+  })
+
+  api.use('/auth', authRoutes)
+  api.use('/metro-lines', metroLineRoutes)
+  api.use('/stations', stationRoutes)
+  api.use('/machines', machineRoutes)
+  api.use('/refills', refillRoutes)
+  api.use('/stock-issues', stockIssueRoutes)
+  api.use('/maintenance', maintenanceRoutes)
+  api.use('/dashboard', dashboardRoutes)
+  api.use('/monthly-data', monthlyDataRoutes)
+  api.use('/reports', reportRoutes)
+  api.use('/cash-collections', cashCollectionRoutes)
+  api.use('/stock', stockRoutes)
+  api.use('/import', importRoutes)
+  api.use('/users', userRoutes)
+  api.use('/audit-logs', auditRoutes)
+
+  api.use((req, res) => {
+    res.status(404).json({ success: false, message: 'Route not found' })
+  })
+
+  api.use(errorHandler)
+
+  return api
+}
+
+const apiRouter = createApiRouter()
+
 const app = express()
-const PORT = process.env.PORT || 5000
 
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }))
 app.use(express.json({ limit: '10mb' }))
 
-app.get('/api/health', (req, res) => {
-  res.json({ success: true, message: 'MetroPad Care backend is running' })
-})
-
-app.use('/api/auth', authRoutes)
-app.use('/api/metro-lines', metroLineRoutes)
-app.use('/api/stations', stationRoutes)
-app.use('/api/machines', machineRoutes)
-app.use('/api/refills', refillRoutes)
-app.use('/api/stock-issues', stockIssueRoutes)
-app.use('/api/maintenance', maintenanceRoutes)
-app.use('/api/dashboard', dashboardRoutes)
-app.use('/api/monthly-data', monthlyDataRoutes)
-app.use('/api/reports', reportRoutes)
-app.use('/api/cash-collections', cashCollectionRoutes)
-app.use('/api/stock', stockRoutes)
-app.use('/api/import', importRoutes)
-app.use('/api/users', userRoutes)
-app.use('/api/audit-logs', auditRoutes)
-
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found' })
-})
+// Mount the API both at /api (standard) and at root (Vercel serverless functions
+// can forward the full request path, so /api/health and /health both work).
+app.use('/api', apiRouter)
+app.use('/', apiRouter)
 
 app.use(errorHandler)
 
 const startServer = async () => {
+  const PORT = process.env.PORT || 5000
   app.listen(PORT, () => {
     console.log(`MetroPad Care backend running on http://localhost:${PORT}`)
   })
@@ -67,6 +86,9 @@ const startServer = async () => {
   }
 }
 
-startServer()
+// On Vercel the function host runs the app — only self-listen outside Vercel.
+if (!process.env.VERCEL) {
+  startServer()
+}
 
 export default app
