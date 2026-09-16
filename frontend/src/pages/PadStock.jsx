@@ -4,6 +4,8 @@ import useApi from '../hooks/useApi.js';
 import useAuth from '../hooks/useAuth.js';
 import useToast from '../hooks/useToast.js';
 import * as stockService from '../services/stock.service.js';
+import * as machineService from '../services/machine.service.js';
+import * as refillService from '../services/refill.service.js';
 import * as reportService from '../services/report.service.js';
 import { getErrorMessage, formatNumber, formatDate } from '../utils/formatters.js';
 import { MONTHS } from '../utils/constants.js';
@@ -195,7 +197,7 @@ function EditMonthlyModal({ isOpen, onClose, onSuccess, row, yearMonth }) {
   );
 }
 
-function PadStock() {
+function AdminPadStock() {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const { addToast } = useToast();
@@ -595,6 +597,199 @@ function PadStock() {
       )}
     </div>
   );
+}
+
+function UserRefillForm() {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const [stations, setStations] = useState([]);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [refillDate, setRefillDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [refillTime, setRefillTime] = useState(() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  });
+  const [refillQuantity, setRefillQuantity] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [price, setPrice] = useState(5);
+
+  useEffect(() => {
+    let active = true;
+    machineService
+      .getAll({ limit: 500 })
+      .then((r) => { if (active) setStations(r.machines || []); })
+      .catch(() => {});
+    stockService
+      .getConfig()
+      .then((c) => { if (active && c?.pricePerPad != null) setPrice(Number(c.pricePerPad)); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const oldStock = Number(selectedMachine?.current_stock) || 0;
+  const capacity = Number(selectedMachine?.capacity) || 0;
+  const availableSpace = Math.max(0, capacity - oldStock);
+  const qty = Number(refillQuantity) || 0;
+  const totalCollected = Math.max(0, qty * price);
+  const loss = oldStock * price;
+  const profit = totalCollected - loss;
+
+  const handleSubmit = async () => {
+    const newErrors = {};
+    if (!refillDate) newErrors.refillDate = 'Refill Date is required';
+    if (!refillTime) newErrors.refillTime = 'Refill Time is required';
+    if (!selectedMachine) newErrors.station = 'Please select a station';
+    if (refillQuantity === '' || refillQuantity == null) {
+      newErrors.quantity = 'Refill Quantity is required';
+    } else if (!Number.isInteger(qty) || qty < 0) {
+      newErrors.quantity = 'Quantity must be a non-negative whole number';
+    } else if (qty > availableSpace) {
+      newErrors.quantity = `Cannot exceed available space (${availableSpace} pads)`;
+    }
+    if (Object.keys(newErrors).length) {
+      setErrors(newErrors);
+      return;
+    }
+    setSaving(true);
+    try {
+      await refillService.create({
+        machineId: selectedMachine.id,
+        stationId: selectedMachine.station_id,
+        refillQuantity: qty,
+        cashCollected: totalCollected,
+        refillDate: `${refillDate}T${refillTime}:00`,
+        refilledBy: user?.name || 'Staff',
+        remark: `Old stock: ${oldStock} | Loss: ₹${loss} | Profit: ₹${profit}`,
+      });
+      addToast('Refilled successfully', 'success');
+      setRefillQuantity('');
+      setSelectedMachine(null);
+      setErrors({});
+    } catch (err) {
+      addToast(getErrorMessage(err), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">Pad Stock</h1>
+      </div>
+
+      <div className="card" style={{ maxWidth: 760, margin: '0 auto' }}>
+        <div className="card-header">
+          <h2 className="card-title">PAD REFILL</h2>
+        </div>
+        <div style={{ padding: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+            <div className="form-group">
+              <label className="form-label">Refill Date</label>
+              <input
+                type="date"
+                className="form-input"
+                value={refillDate}
+                onChange={(e) => { setRefillDate(e.target.value); setErrors((prev) => ({ ...prev, refillDate: undefined })); }}
+              />
+              {errors.refillDate && <span className="form-error">{errors.refillDate}</span>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Refill Time</label>
+              <input
+                type="time"
+                className="form-input"
+                value={refillTime}
+                onChange={(e) => { setRefillTime(e.target.value); setErrors((prev) => ({ ...prev, refillTime: undefined })); }}
+              />
+              {errors.refillTime && <span className="form-error">{errors.refillTime}</span>}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Station Name</label>
+            <select
+              className="form-select"
+              value={selectedMachine?.id || ''}
+              onChange={(e) => {
+                const machine = stations.find((m) => m.id === e.target.value) || null;
+                setSelectedMachine(machine);
+                setErrors((prev) => ({ ...prev, station: undefined }));
+              }}
+            >
+              <option value="">Select Station</option>
+              {stations.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.station_name || m.station_id} — {m.machine_id}
+                </option>
+              ))}
+            </select>
+            {errors.station && <span className="form-error">{errors.station}</span>}
+          </div>
+
+          {selectedMachine && (
+            <div className="info-grid" style={{ background: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+              <div className="info-item">
+                <span className="info-label">Old Refill (pads already in machine)</span>
+                <span className="info-value">{oldStock} pads</span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Capacity</span>
+                <span className="info-value">{capacity} pads</span>
+              </div>
+              <div className="info-item">
+                <span className="info-label">Available Space</span>
+                <span className="info-value">{availableSpace} pads</span>
+              </div>
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Refill Quantity</label>
+            <input
+              type="number"
+              className="form-input"
+              min={0}
+              max={availableSpace || undefined}
+              value={refillQuantity}
+              onChange={(e) => { setRefillQuantity(e.target.value); setErrors((prev) => ({ ...prev, quantity: undefined })); }}
+              placeholder={selectedMachine ? `Enter quantity (max ${availableSpace})` : 'Select station first'}
+              disabled={!selectedMachine}
+            />
+            {errors.quantity && <span className="form-error">{errors.quantity}</span>}
+          </div>
+
+          <div className="info-grid" style={{ background: '#f9f9f9', padding: 12, borderRadius: 8, marginBottom: 20 }}>
+            <div className="info-item">
+              <span className="info-label">Total Collected</span>
+              <span className="info-value">₹{formatNumber(totalCollected)}</span>
+            </div>
+            <div className="info-item">
+              <span className="info-label" style={{ color: '#b91c1c' }}>Loss</span>
+              <span className="info-value" style={{ color: '#b91c1c' }}>₹{formatNumber(loss)}</span>
+            </div>
+          </div>
+
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%', padding: '12px 16px', fontSize: 16 }}
+            onClick={handleSubmit}
+            disabled={saving}
+          >
+            {saving ? 'Submitting...' : 'Submit Refill'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PadStock() {
+  const { user } = useAuth();
+  const isNormalUser = user?.role !== 'ADMIN' && user?.role !== 'OPERATIONS';
+  if (isNormalUser) return <UserRefillForm />;
+  return <AdminPadStock />;
 }
 
 export default PadStock;

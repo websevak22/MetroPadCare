@@ -8,7 +8,7 @@ router.use(protect)
 router.get('/', controller.getAll)
 router.get('/recent', controller.getRecent)
 router.get('/machine/:machineId', controller.getByMachine)
-router.post('/', authorize('ADMIN', 'OPERATIONS'), controller.create)
+router.post('/', authorize('ADMIN', 'OPERATIONS', 'VIEWER'), controller.create)
 router.put('/:id', authorize('ADMIN', 'OPERATIONS'), controller.update)
 router.delete('/:id', authorize('ADMIN', 'OPERATIONS'), controller.remove)
 

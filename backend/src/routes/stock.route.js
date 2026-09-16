@@ -7,11 +7,11 @@ router.use(protect)
 
 router.get('/config', controller.getConfig)
 router.put('/config', authorize('ADMIN'), controller.updateConfig)
-router.get('/summary', controller.getStockSummary)
-router.get('/stations', controller.getStationWiseStock)
-router.get('/monthly', controller.getMonthlyStockReport)
+router.get('/summary', authorize('ADMIN', 'OPERATIONS'), controller.getStockSummary)
+router.get('/stations', authorize('ADMIN', 'OPERATIONS'), controller.getStationWiseStock)
+router.get('/monthly', authorize('ADMIN', 'OPERATIONS'), controller.getMonthlyStockReport)
 router.post('/monthly/status', authorize('ADMIN', 'OPERATIONS'), controller.setMonthlyRefillStatus)
 router.put('/monthly/refill/:machineId', authorize('ADMIN', 'OPERATIONS'), controller.saveMonthlyRefill)
-router.get('/remaining', controller.getRemainingCentralStock)
+router.get('/remaining', authorize('ADMIN', 'OPERATIONS'), controller.getRemainingCentralStock)
 
 export default router
